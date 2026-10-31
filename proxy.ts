@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// Set to false when everything works
+const DEBUG = false;
+
 // Pages anyone can open without logging in
 const PUBLIC_PATHS = [
   "/login",
@@ -23,7 +26,7 @@ function homeFor(role: string) {
   return role === "admin" || role === "staff" ? "/dashboard" : "/portal";
 }
 
-// Redirect while keeping any refreshed session cookies
+// Redirect and keep any refreshed session cookies
 function redirectTo(
   request: NextRequest,
   path: string,
@@ -32,11 +35,11 @@ function redirectTo(
   const url = request.nextUrl.clone();
   url.pathname = path;
   url.search = "";
-  const response = NextResponse.redirect(url);
+  const redirect = NextResponse.redirect(url);
   sessionResponse.cookies.getAll().forEach((cookie) => {
-    response.cookies.set(cookie);
+    redirect.cookies.set(cookie);
   });
-  return response;
+  return redirect;
 }
 
 export async function proxy(request: NextRequest) {
@@ -63,48 +66,58 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // This line also refreshes the session on every request
+  // Refreshes the session on every request. Do not remove.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
 
-  // Public pages: let everyone through
+  if (DEBUG) {
+    console.log("PROXY:", pathname, "->", user?.email ?? "NO USER");
+  }
+
+  // 1. Public pages: everyone is allowed
   if (matches(pathname, PUBLIC_PATHS)) {
     return response;
   }
 
-  // Everything else needs a login
+  // 2. Everything else needs a login
   if (!user) {
     return redirectTo(request, "/login", response);
   }
 
-  // The home page "/" decides by itself where to send the user (see app/page.tsx)
+  // 3. "/" decides by itself where to send the user (app/page.tsx)
   if (pathname === "/") {
     return response;
   }
 
-  // Light query: only the role column, only for this user
-  const { data: profile } = await supabase
+  // 4. Find the role (only one column, only this user)
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
     .single();
 
+  if (profileError && DEBUG) {
+    console.log("PROXY profile error:", profileError.message);
+  }
+
   const role = profile?.role ?? "customer";
 
-  // /admin/* -> admin only
+  if (DEBUG) {
+    console.log("PROXY role:", role);
+  }
+
+  // 5. Role rules
   if (matches(pathname, ADMIN_ONLY) && role !== "admin") {
     return redirectTo(request, homeFor(role), response);
   }
 
-  // /subscriptions, /invoices, /payments, /dashboard -> admin and staff
   if (matches(pathname, STAFF_AREA) && role !== "admin" && role !== "staff") {
     return redirectTo(request, homeFor(role), response);
   }
 
-  // /portal -> customers (admin also allowed for testing)
   if (matches(pathname, CUSTOMER_AREA) && role !== "customer" && role !== "admin") {
     return redirectTo(request, homeFor(role), response);
   }
