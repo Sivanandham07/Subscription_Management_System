@@ -5,13 +5,12 @@ import { StatusBadge } from '../../../components/ui/StatusBadge';
 import { ToastProvider } from '../../../components/ui/Toast';
 import { RevenueChart } from './RevenueChart';
 import { ReminderButton } from './ReminderButton';
+import { createClient } from '../../../lib/supabase/server';
 
 // TODO-AUTH: switch to server createClient()
 // This is the ONLY place that uses the admin client. After Member B's login is merged,
 // replace the body with:  return await createClient();  (import it from '../../../lib/supabase/server')
-async function getDb() {
-  return createAdminClient();
-}
+
 
 type Summary = {
   active_subscriptions: number | string | null;
@@ -111,7 +110,7 @@ export default async function DashboardPage({
   let to = isDate(sp.to) ? sp.to : `${year}-${month}-${lastDay}`;
   if (from > to) [from, to] = [to, from];
 
-  const supabase = await getDb();
+  const supabase = await createClient();
 
   // Subscriptions by status: head:true means "only count, send no rows"
   const countsPromise = Promise.all(
