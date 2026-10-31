@@ -1,15 +1,10 @@
 import Link from 'next/link';
-import { createAdminClient } from '../../../lib/supabase/admin';
 import { formatINR, formatDate } from '../../../lib/format';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
 import { ToastProvider } from '../../../components/ui/Toast';
 import { RevenueChart } from './RevenueChart';
 import { ReminderButton } from './ReminderButton';
 import { createClient } from '../../../lib/supabase/server';
-
-// TODO-AUTH: switch to server createClient()
-// This is the ONLY place that uses the admin client. After Member B's login is merged,
-// replace the body with:  return await createClient();  (import it from '../../../lib/supabase/server')
 
 
 type Summary = {
